@@ -171,9 +171,33 @@ func initialize(filename string, src []byte, opt *Options) ([]byte, *Options, er
 	return src, opt, nil
 }
 
+func makeForcedGroupsList(fileSet *token.FileSet, file *ast.File) []string {
+	counts := make(map[string]int)
+	imps := astutil.Imports(fileSet, file)
+	var forcedGroups []string
+
+	for _, impSection := range imps {
+		for _, importSpec := range impSection {
+			importPath, _ := strconv.Unquote(importSpec.Path.Value)
+			if strings.Contains(importPath, ".") {
+				b := baseImportPath(importPath)
+				counts[b]++
+				if  counts[b] > 2 {
+					forcedGroups = append(forcedGroups, b)
+				}
+			}
+		}
+	}
+
+	return forcedGroups
+}
+
 func formatFile(fileSet *token.FileSet, file *ast.File, src []byte, adjust func(orig []byte, src []byte) []byte, opt *Options) ([]byte, error) {
+	// computes a list of third-party imports that must be separated out
+	forcedGroups := makeForcedGroupsList(fileSet, file)
+
 	mergeImports(opt.Env, fileSet, file)
-	sortImports(opt.Env, fileSet, file)
+	sortImports(opt.Env, fileSet, file, forcedGroups)
 	imps := astutil.Imports(fileSet, file)
 	var spacesBefore []string // import paths we need spaces before
 	for _, impSection := range imps {
@@ -184,7 +208,7 @@ func formatFile(fileSet *token.FileSet, file *ast.File, src []byte, adjust func(
 		lastGroup := -1
 		for _, importSpec := range impSection {
 			importPath, _ := strconv.Unquote(importSpec.Path.Value)
-			groupNum := importGroup(opt.Env, importPath)
+			groupNum := importGroup(opt.Env, importPath, forcedGroups)
 			if groupNum != lastGroup && lastGroup != -1 {
 				spacesBefore = append(spacesBefore, importPath)
 			}
@@ -208,6 +232,7 @@ func formatFile(fileSet *token.FileSet, file *ast.File, src []byte, adjust func(
 	if adjust != nil {
 		out = adjust(src, out)
 	}
+
 	if len(spacesBefore) > 0 {
 		out, err = addImportSpaces(bytes.NewReader(out), spacesBefore)
 		if err != nil {

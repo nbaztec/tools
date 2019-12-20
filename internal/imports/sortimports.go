@@ -15,7 +15,7 @@ import (
 
 // sortImports sorts runs of consecutive import lines in import blocks in f.
 // It also removes duplicate imports when it is possible to do so without data loss.
-func sortImports(env *ProcessEnv, fset *token.FileSet, f *ast.File) {
+func sortImports(env *ProcessEnv, fset *token.FileSet, f *ast.File, forcedImportGroups[]string) {
 	for i, d := range f.Decls {
 		d, ok := d.(*ast.GenDecl)
 		if !ok || d.Tok != token.IMPORT {
@@ -37,14 +37,8 @@ func sortImports(env *ProcessEnv, fset *token.FileSet, f *ast.File) {
 		// Identify and sort runs of specs on successive lines.
 		i := 0
 		specs := d.Specs[:0]
-		for j, s := range d.Specs {
-			if j > i && fset.Position(s.Pos()).Line > 1+fset.Position(d.Specs[j-1].End()).Line {
-				// j begins a new run.  End this one.
-				specs = append(specs, sortSpecs(env, fset, f, d.Specs[i:j])...)
-				i = j
-			}
-		}
-		specs = append(specs, sortSpecs(env, fset, f, d.Specs[i:])...)
+
+		specs = append(specs, sortSpecs(env, fset, f, forcedImportGroups, d.Specs[i:])...)
 		d.Specs = specs
 
 		// Deduping can leave a blank line before the rparen; clean that up.
@@ -142,7 +136,7 @@ type posSpan struct {
 	End   token.Pos
 }
 
-func sortSpecs(env *ProcessEnv, fset *token.FileSet, f *ast.File, specs []ast.Spec) []ast.Spec {
+func sortSpecs(env *ProcessEnv, fset *token.FileSet, f *ast.File, forcedImportGroups[]string, specs []ast.Spec) []ast.Spec {
 	// Can't short-circuit here even if specs are already sorted,
 	// since they might yet need deduplication.
 	// A lone import, however, may be safely ignored.
@@ -191,7 +185,7 @@ func sortSpecs(env *ProcessEnv, fset *token.FileSet, f *ast.File, specs []ast.Sp
 	// Reassign the import paths to have the same position sequence.
 	// Reassign each comment to abut the end of its spec.
 	// Sort the comments by new position.
-	sort.Sort(byImportSpec{env, specs})
+	sort.Sort(byImportSpec{env, specs, forcedImportGroups})
 
 	// Dedup. Thanks to our sorting, we can just consider
 	// adjacent pairs of imports.
@@ -247,6 +241,7 @@ func sortSpecs(env *ProcessEnv, fset *token.FileSet, f *ast.File, specs []ast.Sp
 type byImportSpec struct {
 	env   *ProcessEnv
 	specs []ast.Spec // slice of *ast.ImportSpec
+	forcedGroups []string
 }
 
 func (x byImportSpec) Len() int      { return len(x.specs) }
@@ -255,8 +250,8 @@ func (x byImportSpec) Less(i, j int) bool {
 	ipath := importPath(x.specs[i])
 	jpath := importPath(x.specs[j])
 
-	igroup := importGroup(x.env, ipath)
-	jgroup := importGroup(x.env, jpath)
+	igroup := importGroup(x.env, ipath, x.forcedGroups)
+	jgroup := importGroup(x.env, jpath, x.forcedGroups)
 	if igroup != jgroup {
 		return igroup < jgroup
 	}

@@ -33,35 +33,54 @@ import (
 
 // importToGroup is a list of functions which map from an import path to
 // a group number.
-var importToGroup = []func(env *ProcessEnv, importPath string) (num int, ok bool){
-	func(env *ProcessEnv, importPath string) (num int, ok bool) {
+var importToGroup = []func(env *ProcessEnv, importPath string, forcedGroups []string) (num int, ok bool){
+	func(env *ProcessEnv, importPath string, forcedGroups []string) (num int, ok bool) {
 		if env.LocalPrefix == "" {
 			return
 		}
-		for _, p := range strings.Split(env.LocalPrefix, ",") {
-			if strings.HasPrefix(importPath, p) || strings.TrimSuffix(p, "/") == importPath {
-				return 3, true
+		for i, part := range strings.Split(env.LocalPrefix, ";") {
+			for _, p := range strings.Split(part, ",") {
+				if strings.HasPrefix(importPath, p) || strings.TrimSuffix(p, "/") == importPath {
+					return i + 51, true
+				}
 			}
 		}
 		return
 	},
-	func(_ *ProcessEnv, importPath string) (num int, ok bool) {
+	func(_ *ProcessEnv, importPath string, forcedGroups []string) (num int, ok bool) {
 		if strings.HasPrefix(importPath, "appengine") {
-			return 2, true
+			return 50, true
 		}
 		return
 	},
-	func(_ *ProcessEnv, importPath string) (num int, ok bool) {
+	func(_ *ProcessEnv, importPath string, forcedGroups []string) (num int, ok bool) {
 		if strings.Contains(importPath, ".") {
+			p := baseImportPath(importPath)
+			idx := -1
+			for i, fg := range forcedGroups {
+				if fg == p {
+					idx = i
+					break
+				}
+			}
+
+			if idx != -1 {
+				return idx + 2, true
+			}
+
 			return 1, true
 		}
 		return
 	},
 }
 
-func importGroup(env *ProcessEnv, importPath string) int {
+func baseImportPath(importPath string) string {
+	return strings.Join(strings.Split(importPath, "/")[:3], "/")
+}
+
+func importGroup(env *ProcessEnv, importPath string, forcedGroups []string) int {
 	for _, fn := range importToGroup {
-		if n, ok := fn(env, importPath); ok {
+		if n, ok := fn(env, importPath, forcedGroups); ok {
 			return n
 		}
 	}
