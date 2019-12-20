@@ -15,7 +15,7 @@ import (
 
 // sortImports sorts runs of consecutive import lines in import blocks in f.
 // It also removes duplicate imports when it is possible to do so without data loss.
-func sortImports(env *ProcessEnv, fset *token.FileSet, f *ast.File, forcedImportGroups[]string) {
+func sortImports(env *ProcessEnv, fset *token.FileSet, f *ast.File, forcedImportGroups []string) {
 	for i, d := range f.Decls {
 		d, ok := d.(*ast.GenDecl)
 		if !ok || d.Tok != token.IMPORT {
@@ -136,7 +136,7 @@ type posSpan struct {
 	End   token.Pos
 }
 
-func sortSpecs(env *ProcessEnv, fset *token.FileSet, f *ast.File, forcedImportGroups[]string, specs []ast.Spec) []ast.Spec {
+func sortSpecs(env *ProcessEnv, fset *token.FileSet, f *ast.File, forcedImportGroups []string, specs []ast.Spec) []ast.Spec {
 	// Can't short-circuit here even if specs are already sorted,
 	// since they might yet need deduplication.
 	// A lone import, however, may be safely ignored.
@@ -239,8 +239,8 @@ func sortSpecs(env *ProcessEnv, fset *token.FileSet, f *ast.File, forcedImportGr
 }
 
 type byImportSpec struct {
-	env   *ProcessEnv
-	specs []ast.Spec // slice of *ast.ImportSpec
+	env          *ProcessEnv
+	specs        []ast.Spec // slice of *ast.ImportSpec
 	forcedGroups []string
 }
 

@@ -182,7 +182,7 @@ func makeForcedGroupsList(fileSet *token.FileSet, file *ast.File) []string {
 			if strings.Contains(importPath, ".") {
 				b := baseImportPath(importPath)
 				counts[b]++
-				if  counts[b] > 2 {
+				if counts[b] > 2 {
 					forcedGroups = append(forcedGroups, b)
 				}
 			}
